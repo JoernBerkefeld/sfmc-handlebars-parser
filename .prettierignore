@@ -1,0 +1,10 @@
+node_modules
+dist
+out
+coverage
+package-lock.json
+
+# Frozen AST/error parity goldens — byte-identical regression locks captured by
+# scripts/capture-golden.mjs. Prettier's printWidth array-collapsing would
+# reflow them and break the byte-parity the parity tests assert.
+tests/golden

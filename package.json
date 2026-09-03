@@ -1,0 +1,66 @@
+{
+    "name": "sfmc-handlebars-parser",
+    "version": "0.1.0",
+    "description": "Zero-dependency Handlebars parser producing the @handlebars/parser AST contract for SFMC tooling",
+    "type": "module",
+    "main": "./src/index.js",
+    "types": "./src/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./src/index.d.ts",
+            "import": "./src/index.js"
+        }
+    },
+    "files": [
+        "src"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/JoernBerkefeld/sfmc-handlebars-parser.git"
+    },
+    "bugs": {
+        "url": "https://github.com/JoernBerkefeld/sfmc-handlebars-parser/issues"
+    },
+    "homepage": "https://github.com/JoernBerkefeld/sfmc-handlebars-parser#readme",
+    "author": "Joern Berkefeld",
+    "keywords": [
+        "handlebars",
+        "sfmc",
+        "salesforce",
+        "marketing-cloud",
+        "parser",
+        "ast"
+    ],
+    "license": "MIT",
+    "scripts": {
+        "test": "npm run test:types && node --test tests/*.test.mjs",
+        "test:types": "tsc --noEmit -p tsconfig.types.json",
+        "lint": "eslint .",
+        "lint:fix": "eslint --fix .",
+        "prepare": "husky || true",
+        "format": "prettier --write .",
+        "format:check": "prettier --check ."
+    },
+    "engines": {
+        "node": ">=22.0.0"
+    },
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "@handlebars/parser": "^2.2.2",
+        "eslint": "^10.8.0",
+        "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-jsdoc": "^63.3.3",
+        "eslint-plugin-prettier": "^5.5.6",
+        "eslint-plugin-unicorn": "^73.0.0",
+        "globals": "^17.9.0",
+        "husky": "^9.1.7",
+        "lint-staged": "^17.3.0",
+        "prettier": "^3.9.6",
+        "typescript": "^6.0.3"
+    },
+    "lint-staged": {
+        "*.{js,mjs,cjs}": [
+            "eslint --fix"
+        ]
+    }
+}

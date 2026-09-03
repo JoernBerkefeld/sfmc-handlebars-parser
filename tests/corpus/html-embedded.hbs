@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <h1>Hello {{recipient.name}}</h1>
+    {{#if promoActive}}
+      <p>Offer code: {{promo.code}}</p>
+    {{else}}
+      <p>No active offer.</p>
+    {{/if}}
+    <footer>{!$link.PreferenceCenterUrl}</footer>
+  </body>
+</html>

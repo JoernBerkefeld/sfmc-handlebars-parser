@@ -1,0 +1,90 @@
+{
+    "bare-caret.hbs": {
+        "class": "jison",
+        "message": "Parse error on line 1:\n{{^}}\n^\nExpecting 'EOF', 'COMMENT', 'CONTENT', 'OPEN_RAW_BLOCK', 'OPEN_BLOCK', 'OPEN_INVERSE', 'OPEN', 'OPEN_UNESCAPED', 'OPEN_PARTIAL', 'OPEN_PARTIAL_BLOCK', got 'INVERSE'",
+        "hash": {
+            "loc": {
+                "first_line": 1,
+                "first_column": 0,
+                "last_line": 1,
+                "last_column": 0
+            }
+        }
+    },
+    "block-mismatch.hbs": {
+        "class": "exception",
+        "message": "alpha doesn't match beta - 1:3",
+        "lineNumber": 1,
+        "column": 3
+    },
+    "doubled-else.hbs": {
+        "class": "jison",
+        "message": "Parse error on line 1:\n{{else}}{{else}}\n^\nExpecting 'EOF', 'COMMENT', 'CONTENT', 'OPEN_RAW_BLOCK', 'OPEN_BLOCK', 'OPEN_INVERSE', 'OPEN', 'OPEN_UNESCAPED', 'OPEN_PARTIAL', 'OPEN_PARTIAL_BLOCK', got 'INVERSE'",
+        "hash": {
+            "loc": {
+                "first_line": 1,
+                "first_column": 0,
+                "last_line": 1,
+                "last_column": 0
+            }
+        }
+    },
+    "empty-mustache.hbs": {
+        "class": "jison",
+        "message": "Parse error on line 1:\n{{ }}\n---^\nExpecting 'OPEN_SEXPR', 'ID', 'OPEN_ARRAY', 'STRING', 'NUMBER', 'BOOLEAN', 'UNDEFINED', 'NULL', 'DATA', got 'CLOSE'",
+        "hash": {
+            "loc": {
+                "first_line": 1,
+                "first_column": 0,
+                "last_line": 1,
+                "last_column": 2
+            }
+        }
+    },
+    "invalid-path.hbs": {
+        "class": "exception",
+        "message": "Invalid path: foo/.. - 1:2",
+        "lineNumber": 1,
+        "column": 2
+    },
+    "unclosed-block.hbs": {
+        "class": "jison",
+        "message": "Parse error on line 1:\n{{#alpha}}x\n-----------^\nExpecting 'OPEN_INVERSE_CHAIN', 'INVERSE', 'OPEN_ENDBLOCK', got 'EOF'",
+        "hash": {
+            "loc": {
+                "first_line": 1,
+                "first_column": 10,
+                "last_line": 1,
+                "last_column": 11
+            }
+        }
+    },
+    "unexpected-sep.hbs": {
+        "class": "jison",
+        "message": "Parse error on line 1:\n{{.foo}}\n--^\nExpecting 'OPEN_SEXPR', 'ID', 'OPEN_ARRAY', 'STRING', 'NUMBER', 'BOOLEAN', 'UNDEFINED', 'NULL', 'DATA', got 'SEP'",
+        "hash": {
+            "loc": {
+                "first_line": 1,
+                "first_column": 0,
+                "last_line": 1,
+                "last_column": 2
+            }
+        }
+    },
+    "unterminated-comment.hbs": {
+        "class": "exception",
+        "message": "Lexical error on line 1. Unrecognized text.\n{{!-{{!-- unterminated\n----^"
+    },
+    "unterminated-string.hbs": {
+        "class": "jison",
+        "message": "Parse error on line 1:\n{{foo \"bar}}\n------^\nExpecting 'CLOSE_RAW_BLOCK', 'CLOSE', 'CLOSE_UNESCAPED', 'OPEN_SEXPR', 'CLOSE_SEXPR', 'ID', 'EQUALS', 'OPEN_ARRAY', 'OPEN_BLOCK_PARAMS', 'STRING', 'NUMBER', 'BOOLEAN', 'UNDEFINED', 'NULL', 'DATA', 'SEP', 'PRIVATE_SEP', got 'INVALID'",
+        "hash": {
+            "loc": {
+                "first_line": 1,
+                "first_column": 2,
+                "last_line": 1,
+                "last_column": 5
+            }
+        }
+    }
+}
