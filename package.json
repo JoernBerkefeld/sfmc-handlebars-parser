@@ -1,6 +1,6 @@
 {
     "name": "sfmc-handlebars-parser",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Zero-dependency Handlebars parser producing the @handlebars/parser AST contract for SFMC tooling",
     "type": "module",
     "main": "./src/index.js",
