@@ -160,6 +160,47 @@ const BLOCK_ERROR_FILES = [
     'unclosed-block.hbs',
 ];
 
+// ── Dot-path drop-in (`{{.}}` / `{{..}}` / `{{...}}`) ──────────────────────────────────────
+// `@handlebars/parser` lexes `.` and `..` as path IDs (current / parent context). `{{...}}` is
+// therefore path `..` plus a `.` positional param — not a throw. `{{.foo}}` remains invalid.
+
+test('parse: {{...}} is a mustache with parent-context path plus a current-context param', () => {
+    const ast = parse('{{...}}');
+    assert.equal(ast.type, 'Program');
+    assert.equal(ast.body.length, 1);
+    const mustache = ast.body[0];
+    assert.equal(mustache.type, 'MustacheStatement');
+    assert.equal(mustache.path.type, 'PathExpression');
+    assert.equal(mustache.path.original, '..');
+    assert.equal(mustache.path.depth, 1);
+    assert.deepEqual(mustache.path.parts, []);
+    assert.equal(mustache.path.this, false);
+    assert.equal(mustache.params.length, 1);
+    assert.equal(mustache.params[0].type, 'PathExpression');
+    assert.equal(mustache.params[0].original, '.');
+    assert.equal(mustache.params[0].depth, 0);
+    assert.deepEqual(mustache.params[0].parts, []);
+});
+
+test('parse: {{.}} is current-context path; {{..}} is parent-context path', () => {
+    const current = parse('{{.}}').body[0].path;
+    assert.equal(current.original, '.');
+    assert.equal(current.depth, 0);
+    assert.deepEqual(current.parts, []);
+
+    const parent = parse('{{..}}').body[0].path;
+    assert.equal(parent.original, '..');
+    assert.equal(parent.depth, 1);
+    assert.deepEqual(parent.parts, []);
+});
+
+test('parse: {{...foo}} stays one path (parent hop + segment)', () => {
+    const pathNode = parse('{{...foo}}').body[0].path;
+    assert.equal(pathNode.original, '...foo');
+    assert.equal(pathNode.depth, 1);
+    assert.deepEqual(pathNode.parts, ['foo']);
+});
+
 for (const file of BLOCK_ERROR_FILES) {
     test(`parse error: ${file} matches golden class + location`, () => {
         const source = readCorpus(file, 'errors');

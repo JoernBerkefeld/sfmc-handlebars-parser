@@ -46,8 +46,9 @@ It accepts every construct `@handlebars/parser@2.2.2` accepts:
 - Comments: `{{! }}` and `{{!-- --}}`.
 - Blocks: `{{#x}}…{{/x}}`, inverse `{{^x}}…{{/x}}`, `{{else}}`, `{{else if …}}` chaining,
   block params `as |a b|`, and empty block bodies.
-- Paths: `this`, `./`, `../` (parent depth), `@data` variables, segment literals `[…]`,
-  the legacy `/` separator, and identifiers containing `$` / `_`.
+- Paths: `this`, `.` (current context), `..` (parent), `./`, `../` (parent depth), a
+  `{{...}}` mustache (parent path plus a current-context param), `@data` variables,
+  segment literals `[…]`, the legacy `/` separator, and identifiers containing `$` / `_`.
 - Literals: strings (`"…"` / `'…'` with escapes), numbers (including negative),
   `true` / `false` / `null` / `undefined`.
 - Subexpressions `( … )` nested arbitrarily, and hash pairs `key=value`.

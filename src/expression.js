@@ -198,10 +198,13 @@ function readContiguousSegment(reader) {
  * Parses a single `PathExpression` starting at the cursor (leading whitespace is skipped first).
  *
  * Grammar handled: an optional `@` data prefix; leading `../` parent hops (each `..` increments
- * `depth`); a `this` context head; `.`- and legacy `/`-separated segments; bare-word `ID`
- * segments (including `$`/`_`/`-` ids); and `[segment literal]` parts whose inner text is kept
- * verbatim. `original` is the raw path text with segment-literal brackets removed and every
- * separator kept. See {@link pathExpression} for how `head`/`tail`/`this` are derived.
+ * `depth`); a bare `..` parent-context path; a bare `.` current-context path; a `this` context
+ * head; `.`- and legacy `/`-separated segments; bare-word `ID` segments (including `$`/`_`/`-`
+ * ids); and `[segment literal]` parts whose inner text is kept verbatim. Adjacent extra `.`/`..`
+ * tokens that do not continue this path (e.g. the trailing `.` of `{{...}}`) are left unconsumed
+ * so the caller can parse them as the next expression. `original` is the raw path text with
+ * segment-literal brackets removed and every separator kept. See {@link pathExpression} for how
+ * `head`/`tail`/`this` are derived.
  *
  * @param {object} reader - The shared cursor from {@link createReader}.
  * @returns {object} A `PathExpression` node.
@@ -220,11 +223,14 @@ export function parsePath(reader) {
     const parts = [];
     let isSawThisHead = false;
     let segmentCount = 0;
+    let isStarted = false;
+    let isLastWasSlash = false;
 
     // Optional `@` data prefix.
     if (reader.peekType() === TokenType.DATA) {
         isData = true;
         endOffset = reader.next().end;
+        isStarted = true;
     }
 
     // Walk segments and separators until the path can no longer continue.
@@ -249,8 +255,42 @@ export function parsePath(reader) {
                         },
                     );
                 }
+                // A second adjacent `..` that is not a `../` hop (e.g. `{{....}}`) is a new
+                // path, not more depth on this one. Leave it for the next expression.
+                if (isStarted && !isLastWasSlash) {
+                    break;
+                }
                 depth++;
+                isLastWasSlash = false;
+                isStarted = true;
+                endOffset = token.end;
+                reader.next();
+                continue;
             }
+            if (token.value === '.') {
+                const next = reader.peek(1);
+                const continues =
+                    isLastWasSlash ||
+                    (next && next.type === TokenType.SEP && next.value === '/') ||
+                    (next && SEGMENT_TOKEN_TYPES.has(next.type) && isStarted);
+                if (!continues) {
+                    // Standalone `.` is current-context (`{{.}}`). A trailing `.` after an
+                    // already-started path (`{{...}}`, `{{foo.}}`) is a new path — leave it.
+                    if (!isStarted) {
+                        endOffset = token.end;
+                        reader.next();
+                    }
+                    break;
+                }
+                isLastWasSlash = false;
+                isStarted = true;
+                endOffset = token.end;
+                reader.next();
+                continue;
+            }
+            // `/` separator (`./`, `../`, `foo/bar`).
+            isLastWasSlash = true;
+            isStarted = true;
             endOffset = token.end;
             reader.next();
             continue;
@@ -261,6 +301,8 @@ export function parsePath(reader) {
             // contiguous run as one path segment (`parts: ["0x1"]`).
             const segment = readContiguousSegment(reader);
             endOffset = segment.endOffset;
+            isLastWasSlash = false;
+            isStarted = true;
             if (segmentCount === 0 && token.type === TokenType.ID && segment.value === 'this') {
                 // A `this` head is not a part; it only sets the `this` flag (when a tail follows).
                 isSawThisHead = true;

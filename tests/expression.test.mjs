@@ -167,6 +167,34 @@ test('parsePath: ../../grandParentValue -> depth 2', () => {
     assert.equal(node.original, '../../grandParentValue');
 });
 
+test('parsePath: {{...}} head stops at parent-context .. and leaves the trailing .', () => {
+    const reader = readerAfterOpen('{{...}}');
+    const node = parsePath(reader);
+    assert.equal(node.original, '..');
+    assert.equal(node.depth, 1);
+    assert.deepEqual(node.parts, []);
+    assert.equal(node.this, false);
+    assert.equal(reader.peekType(), TokenType.SEP);
+    assert.equal(reader.peek().value, '.');
+});
+
+test('parsePath: {{.}} is current-context (original ., depth 0, empty parts)', () => {
+    const reader = readerAfterOpen('{{.}}');
+    const node = parsePath(reader);
+    assert.equal(node.original, '.');
+    assert.equal(node.depth, 0);
+    assert.deepEqual(node.parts, []);
+    assert.equal(node.head, undefined);
+});
+
+test('parsePath: {{...foo}} is one path with depth 1 and part foo', () => {
+    const reader = readerAfterOpen('{{...foo}}');
+    const node = parsePath(reader);
+    assert.equal(node.original, '...foo');
+    assert.equal(node.depth, 1);
+    assert.deepEqual(node.parts, ['foo']);
+});
+
 test('parsePath: ./sibling -> depth 0, this false', () => {
     const reader = readerAfterOpen('{{./sibling}}');
     const node = parsePath(reader);

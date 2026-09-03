@@ -298,8 +298,9 @@ function parseMustache(reader) {
 /**
  * Parses the CALL HEAD of a mustache: a literal (`{{"str"}}` / `{{true}}` / `{{5}}` place the
  * literal node in the `path` slot) when the cursor is on a standalone literal, otherwise a
- * `PathExpression`. When neither is possible (e.g. a leading `.` separator), upstream throws a
- * Jison parse error anchored at the OPEN token.
+ * `PathExpression`. Current-context `.` and parent-context `..` (including `{{...}}`, which is
+ * path `..` plus a `.` param) are valid heads. A leading `.` followed by a segment (`{{.foo}}`)
+ * is not: upstream throws a Jison parse error anchored at the OPEN token.
  *
  * @param {object} reader - The shared cursor from {@link createReader}.
  * @param {object} open - The consumed OPEN token (for error anchoring).
@@ -312,13 +313,20 @@ function parseCallHead(reader, open) {
     }
     reader.skipWhitespace();
     const token = reader.peek();
-    // A path may begin with a relative/parent context (`./`, `../`) — a `.`/`..` SEP immediately
-    // followed by a `/` SEP. A leading bare `.` SEP that is NOT part of `./` (e.g. `{{.foo}}`) is
-    // an invalid path start: upstream throws a Jison "got 'SEP'" error anchored at the OPEN token.
+    // A path may begin with:
+    //   - relative/parent context (`./`, `../`) — a `.`/`..` SEP immediately followed by `/`
+    //   - parent-context `..` (`{{..}}`, and the head of `{{...}}`)
+    //   - current-context `.` (`{{.}}`) when it is NOT followed by a segment
+    // A leading `.` SEP followed by an ID (`{{.foo}}`) is still invalid: upstream throws a
+    // Jison "got 'SEP'" error anchored at the OPEN token.
     if (token && token.type === TokenType.SEP) {
         const next = reader.peek(1);
-        const isRelativeStart = next && next.type === TokenType.SEP && next.value === '/';
-        if (!isRelativeStart) {
+        const isSlashContinue = next && next.type === TokenType.SEP && next.value === '/';
+        const isParentContext = token.value === '..';
+        const nextIsSegment =
+            next && [TokenType.ID, TokenType.NUMBER, TokenType.SEGMENT].includes(next.type);
+        const isCurrentContext = token.value === '.' && !nextIsSegment;
+        if (!isSlashContinue && !isParentContext && !isCurrentContext) {
             throw jisonAt(reader.table, open.start, open.end);
         }
     }
