@@ -58,7 +58,10 @@ It accepts every construct `@handlebars/parser@2.2.2` accepts:
 
 On a malformed template, `parse` throws. Parse errors mirror the two upstream error
 classes: a Jison-class error carries `hash.loc` (`{first_line, first_column, last_line,
-last_column}`); an exception-class error carries `lineNumber` / `column`.
+last_column}`); an exception-class error carries `lineNumber` (1-based) / `column`
+(0-based). The positions follow upstream. The messages are our own, one line each, and say
+what is wrong, for example `Unclosed block {{#if}}: expected {{/if}}.`. Every error has a
+position, including an expression that is still being typed.
 
 ```js
 import { parse } from 'sfmc-handlebars-parser';

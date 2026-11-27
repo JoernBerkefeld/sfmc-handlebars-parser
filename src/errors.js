@@ -11,7 +11,7 @@
  *     `first_column` and reports the real position.
  *   - {@link HandlebarsException} — the **exception-class** logic error (block-name mismatch,
  *     `Invalid path:`, lexical "Unrecognized text"). Carries NO `hash`; instead it MAY set
- *     `lineNumber` / `column` (1-based line, 1-based column, matching upstream's `Exception`).
+ *     `lineNumber` / `column` (1-based line, 0-based column, matching upstream's `Exception`).
  *     When it carries neither (the lexical case), the wrapper falls back to reporting `1:1`.
  *
  * The golden error projection (`tests/golden/errors.baseline.json`) classifies an error as
@@ -53,9 +53,9 @@ export class HandlebarsException extends Error {
     /**
      * @param {string} message - The diagnostic message (the ` - line:column` suffix, if any, is
      * expected to already be appended by the caller for the logic-error cases).
-     * @param {object} [position] - Optional 1-based line / 1-based column of the error.
+     * @param {object} [position] - Optional 1-based line / 0-based column of the error.
      * @param {number} [position.lineNumber] - 1-based line number.
-     * @param {number} [position.column] - 1-based column number.
+     * @param {number} [position.column] - 0-based column number.
      */
     constructor(message, position) {
         super(message);

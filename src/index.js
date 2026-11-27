@@ -87,7 +87,12 @@ export function parse(code) {
     // A well-formed block-free template consumes every token up to EOF.
     if (!reader.atEnd()) {
         const token = reader.peek();
-        throw jisonAt(lineTable, token.start, token.end);
+        throw jisonAt(
+            lineTable,
+            token.start,
+            token.end,
+            `Unexpected '${code.slice(token.start, token.end)}'.`,
+        );
     }
     // Upstream spans the Program from its FIRST child's start to its LAST child's end (the
     // per-node `loc`s already account for escaped content trimming a leading `\`). An empty
@@ -158,7 +163,7 @@ export function parseProgram(reader, isTerminator) {
                 // an unexpected INVERSE token at statement level. Upstream throws a Jison parse
                 // error at `1:0`; reproduce that here (W2b-1 owns bare-caret).
                 if (sigil.value === '^' && isBareInverse(reader)) {
-                    throw jisonAt(reader.table, 0, 0);
+                    throw jisonAt(reader.table, 0, 0, '{{^}} is only allowed inside a block.');
                 }
                 body.push(parseBlockLike(reader));
                 continue;
@@ -168,13 +173,23 @@ export function parseProgram(reader, isTerminator) {
             // at the opener (`got 'INVERSE'`). Block bodies consume their own `{{else}}` via the
             // terminator, so this only fires for a stray/top-level else.
             if (sigil && sigil.type === TokenType.ID && sigil.value === 'else') {
-                throw jisonAt(reader.table, token.start, token.start);
+                throw jisonAt(
+                    reader.table,
+                    token.start,
+                    token.start,
+                    '{{else}} is only allowed inside a block.',
+                );
             }
             body.push(parseMustache(reader));
             continue;
         }
         // Any other statement-level token here is unexpected (e.g. a stray CLOSE / SIGIL).
-        throw jisonAt(reader.table, token.start, token.end);
+        throw jisonAt(
+            reader.table,
+            token.start,
+            token.end,
+            `Unexpected '${reader.source.slice(token.start, token.end)}'.`,
+        );
     }
     return body;
 }
@@ -270,10 +285,25 @@ function parseMustache(reader) {
         isEscaped = false;
         reader.next();
     }
+    // A closing tag without an open block (`{{/if}}`) reaches here as a plain mustache.
+    if (reader.peekType() === TokenType.SIGIL && reader.peek().value === '/') {
+        const name = /^\{\{~?\s*\/\s*([^\s}~]*)/.exec(reader.source.slice(open.start))?.[1] ?? '';
+        throw jisonAt(
+            reader.table,
+            open.start,
+            open.end,
+            `{{/${name}}} has no matching {{#${name}}} before it.`,
+        );
+    }
     reader.skipWhitespace();
     // Empty body (`{{ }}`) — upstream throws a Jison parse error anchored at the OPEN token.
     if (reader.peekType() === TokenType.CLOSE) {
-        throw jisonAt(reader.table, open.start, open.end);
+        throw jisonAt(
+            reader.table,
+            open.start,
+            open.end,
+            'Empty expression: write a helper or a value between the braces.',
+        );
     }
     const head = parseCallHead(reader, open);
     const { params, hash } = parseParametersAndHash(
@@ -281,6 +311,17 @@ function parseMustache(reader) {
         (token) => token.type === TokenType.CLOSE,
     );
     reader.skipWhitespace();
+    // A missing `}}` (an expression still being typed, `{{upp`) is reported on the opener, where
+    // upstream reports the single-word case; other shapes are best effort (not parity-gated).
+    if (reader.peekType() !== TokenType.CLOSE) {
+        const typed = /^\{\{\{?[^\s{}]*/.exec(reader.source.slice(open.start))?.[0] ?? '{{';
+        throw jisonAt(
+            reader.table,
+            open.start,
+            open.end,
+            `Unclosed expression ${typed}: expected '}}'.`,
+        );
+    }
     const close = reader.expect(TokenType.CLOSE);
     const strip = { open: !!open.strip, close: !!close.strip };
     return mustacheStatement(
@@ -327,7 +368,12 @@ function parseCallHead(reader, open) {
             next && [TokenType.ID, TokenType.NUMBER, TokenType.SEGMENT].includes(next.type);
         const isCurrentContext = token.value === '.' && !nextIsSegment;
         if (!isSlashContinue && !isParentContext && !isCurrentContext) {
-            throw jisonAt(reader.table, open.start, open.end);
+            throw jisonAt(
+                reader.table,
+                open.start,
+                open.end,
+                "Invalid path: a name cannot follow a leading '.'.",
+            );
         }
     }
     return parsePath(reader);
@@ -497,7 +543,7 @@ function consumeCloseTag(reader, openName, openPath) {
     if (closePath.original !== openName) {
         const at = openPath.loc.start;
         throw new HandlebarsException(
-            `${openName} doesn't match ${closePath.original} - ${at.line}:${at.column}`,
+            `{{/${closePath.original}}} does not close {{#${openName}}}. Expected {{/${openName}}}.`,
             { lineNumber: at.line, column: at.column },
         );
     }
@@ -511,17 +557,21 @@ function consumeCloseTag(reader, openName, openPath) {
  * close was expected (the next token, typically `EOF`), e.g. `got 'EOF'`.
  *
  * @param {object} reader - The shared cursor, positioned where a close/inverse was expected.
+ * @param {string} [name] - The open block's name, for the message.
  * @returns {never} Always throws.
  * @throws {HandlebarsParseError} The Jison-class unclosed-block error.
  */
-function throwUnclosed(reader) {
+function throwUnclosed(reader, name) {
+    const message = name
+        ? `Unclosed block {{#${name}}}: expected {{/${name}}}.`
+        : 'Unclosed block: expected its closing tag.';
     // Upstream anchors an unclosed block at the last consumed token through the point where the
     // close was expected (typically `EOF`): e.g. `{{#alpha}}x` reports `1:10`-`1:11` (the `x`
     // content start through `EOF`). Span `[previousToken.start, currentToken.end]`.
     const current = reader.peek() || { start: reader.source.length, end: reader.source.length };
     const previous = reader.peek(-1);
     const startOffset = previous ? previous.start : current.start;
-    throw jisonAt(reader.table, startOffset, current.end);
+    throw jisonAt(reader.table, startOffset, current.end, message);
 }
 
 /**
@@ -550,7 +600,7 @@ function parseBlockStatement(reader, isCaret) {
     // Body statements until an inverse split or the `{{/name}}` close.
     const body = parseProgram(reader, () => atBranchEnd(reader));
     if (reader.atEnd()) {
-        throwUnclosed(reader);
+        throwUnclosed(reader, path.original);
     }
     const bodyEnd = reader.peek().start;
     const bodyProgram = makeSubProgram(reader, body, bodyStart, bodyEnd, {
@@ -571,7 +621,7 @@ function parseBlockStatement(reader, isCaret) {
 
     // Consume the matching `{{/name}}` close.
     if (!isCloseTag(reader)) {
-        throwUnclosed(reader);
+        throwUnclosed(reader, path.original);
     }
     const { closeToken } = consumeCloseTag(reader, path.original, path);
     return blockStatement(reader.table, open.start, closeToken.end, {
@@ -619,7 +669,7 @@ function parseInverseBranch(reader, blockPath) {
     const bodyStart = elseClose.end;
     const body = parseProgram(reader, () => atBranchEnd(reader));
     if (reader.atEnd()) {
-        throwUnclosed(reader);
+        throwUnclosed(reader, blockPath.original);
     }
     const bodyEnd = reader.peek().start;
     const inverse = makeSubProgram(reader, body, bodyStart, bodyEnd);
@@ -667,7 +717,7 @@ function parseChainedBlock(reader, blockPath) {
 
     const body = parseProgram(reader, () => atBranchEnd(reader));
     if (reader.atEnd()) {
-        throwUnclosed(reader);
+        throwUnclosed(reader, blockPath.original);
     }
     const bodyEnd = reader.peek().start;
     const primaryProgram = makeSubProgram(reader, body, bodyStart, bodyEnd, {
@@ -678,7 +728,7 @@ function parseChainedBlock(reader, blockPath) {
 
     // The nested block ends at the shared `{{/name}}` close's OPEN start (not consumed here).
     if (!isCloseTag(reader)) {
-        throwUnclosed(reader);
+        throwUnclosed(reader, blockPath.original);
     }
     const closeOpenStart = reader.peek().start;
     const block = blockStatement(reader.table, open.start, closeOpenStart, {
@@ -934,12 +984,13 @@ function parseDecoratorBlock(reader) {
  * @param {import('./loc.js').LineTable} table - Line table for the source.
  * @param {number} startOffset - Absolute start offset of the error span.
  * @param {number} endOffset - Absolute end offset of the error span.
+ * @param {string} message - What is wrong, in one line (the span is reported separately).
  * @returns {HandlebarsParseError} The Jison-class parse error.
  */
-function jisonAt(table, startOffset, endOffset) {
+function jisonAt(table, startOffset, endOffset, message) {
     const start = offsetToPosition(table, startOffset);
     const end = offsetToPosition(table, endOffset);
-    return new HandlebarsParseError('Parse error', {
+    return new HandlebarsParseError(message, {
         first_line: start.line,
         first_column: start.column,
         last_line: end.line,
@@ -970,11 +1021,16 @@ function convertTokenizerError(error, source) {
         // Jison class. Upstream anchors at the preceding call-head token (the id before the
         // opening quote). Locate the maximal id run ending just before the quote at `error.offset`.
         const { start, end } = precedingIdSpan(source, error.offset);
-        return jisonAt(buildLineTable(source), start, end);
+        return jisonAt(
+            buildLineTable(source),
+            start,
+            end,
+            'Unterminated string: the closing quote is missing.',
+        );
     }
     // Other lexical kinds (unterminated raw block / segment) belong to W2b-2's block surface;
     // surface them as a Jison error at the reported offset for now.
-    return jisonAt(buildLineTable(source), error.offset, error.offset);
+    return jisonAt(buildLineTable(source), error.offset, error.offset, error.message);
 }
 
 /**

@@ -26,7 +26,33 @@
  */
 
 import { TokenType } from './tokenizer.js';
-import { HandlebarsException } from './errors.js';
+import { HandlebarsException, HandlebarsParseError } from './errors.js';
+
+/**
+ * Readable names of the tokens `expect()` can ask for, for error messages.
+ */
+const TOKEN_DESCRIPTIONS = {
+    CLOSE: "'}}'",
+    CLOSE_PAREN: "')'",
+    OPEN: "'{{'",
+    OPEN_PAREN: "'('",
+    EQUALS: "'='",
+    PIPE: "'|'",
+    ID: 'a name',
+    SIGIL: 'a block sigil',
+    RAW_CLOSE: "'}}}}'",
+    RAW_OPEN: "'{{{{'",
+};
+
+/**
+ * Readable name of a token type.
+ *
+ * @param {string} type - A {@link import('./tokenizer.js').TokenType} value.
+ * @returns {string} The description used in error messages.
+ */
+function describeToken(type) {
+    return TOKEN_DESCRIPTIONS[type] ?? type;
+}
 import { offsetToPosition } from './loc.js';
 import {
     booleanLiteral,
@@ -121,8 +147,9 @@ export function createReader(tokens, table, source) {
         },
 
         /**
-         * Consumes the current token, asserting its `type`. Throws a plain `Error` (W2b owns
-         * user-facing error classes) when the type does not match.
+         * Consumes the current token, asserting its `type`. Throws a {@link HandlebarsParseError}
+         * on the unexpected token (or the end of the source) when the type does not match. This
+         * position is best effort: it is not part of the upstream parity gate.
          *
          * @param {string} type - The expected {@link import('./tokenizer.js').TokenType}.
          * @returns {object} The consumed token.
@@ -130,8 +157,22 @@ export function createReader(tokens, table, source) {
         expect(type) {
             const token = tokens[reader.index];
             if (!token || token.type !== type) {
-                throw new Error(
-                    `expected ${type} but found ${token ? token.type : 'end of input'}`,
+                const isAtEnd = !token || token.type === TokenType.EOF;
+                const startOffset = isAtEnd ? source.length : token.start;
+                const endOffset = isAtEnd ? source.length : token.end;
+                const found = isAtEnd
+                    ? 'the end of the template'
+                    : `'${source.slice(startOffset, endOffset)}'`;
+                const start = offsetToPosition(table, startOffset);
+                const end = offsetToPosition(table, endOffset);
+                throw new HandlebarsParseError(
+                    `Expected ${describeToken(type)} but found ${found}.`,
+                    {
+                        first_line: start.line,
+                        first_column: start.column,
+                        last_line: end.line,
+                        last_column: end.column,
+                    },
                 );
             }
             reader.index++;

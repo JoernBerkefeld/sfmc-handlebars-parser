@@ -232,3 +232,48 @@ for (const file of BLOCK_ERROR_FILES) {
         }
     });
 }
+
+/**
+ * Parse `source` and return the thrown error's message and position (or null when it parses).
+ *
+ * @param {string} source - Template text.
+ * @returns {{message: string, at: string} | null} Message and `line:column` start.
+ */
+function errorOf(source) {
+    try {
+        parse(source);
+        return null;
+    } catch (ex) {
+        const loc = ex.hash?.loc;
+        const at = loc ? `${loc.first_line}:${loc.first_column}` : `${ex.lineNumber}:${ex.column}`;
+        return { message: ex.message, at };
+    }
+}
+
+test('parse errors explain the problem in one line', () => {
+    const cases = [
+        ['{{upp', "Unclosed expression {{upp: expected '}}'.", '1:0'],
+        ['<p>a</p>\n{{upp', "Unclosed expression {{upp: expected '}}'.", '2:0'],
+        ['{{foo (bar}}', "Expected ')' but found '}}'.", '1:10'],
+        ['{{ }}', 'Empty expression: write a helper or a value between the braces.', '1:0'],
+        ['<p>{{#if a}}x', 'Unclosed block {{#if}}: expected {{/if}}.', '1:12'],
+        ['{{#if a}}x{{/each}}', '{{/each}} does not close {{#if}}. Expected {{/if}}.', '1:3'],
+        ['x {{/if}}', '{{/if}} has no matching {{#if}} before it.', '1:2'],
+        ['{{else}}', '{{else}} is only allowed inside a block.', '1:0'],
+        ['{{.foo}}', "Invalid path: a name cannot follow a leading '.'.", '1:0'],
+        ['{{foo "a}}', 'Unterminated string: the closing quote is missing.', '1:2'],
+    ];
+    for (const [source, message, at] of cases) {
+        assert.deepEqual(errorOf(source), { message, at }, source);
+    }
+});
+
+test('an expression error is a positioned HandlebarsParseError, not a plain Error', () => {
+    try {
+        parse('{{foo (bar}}');
+        assert.fail('expected a parse error');
+    } catch (ex) {
+        assert.equal(ex.name, 'HandlebarsParseError');
+        assert.ok(ex.hash?.loc, 'hash.loc is set');
+    }
+});
