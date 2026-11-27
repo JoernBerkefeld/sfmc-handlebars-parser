@@ -314,6 +314,16 @@ function parseMustache(reader) {
     // A missing `}}` (an expression still being typed, `{{upp`) is reported on the opener, where
     // upstream reports the single-word case; other shapes are best effort (not parity-gated).
     if (reader.peekType() !== TokenType.CLOSE) {
+        const next = reader.peek();
+        // Something other than the end of the template or the next `{{`: name the stray token.
+        if (next && next.type !== TokenType.EOF && !reader.source.startsWith('{{', next.start)) {
+            throw jisonAt(
+                reader.table,
+                next.start,
+                next.end,
+                `Unexpected '${reader.source.slice(next.start, next.end)}' in this expression.`,
+            );
+        }
         const typed = /^\{\{\{?[^\s{}]*/.exec(reader.source.slice(open.start))?.[0] ?? '{{';
         throw jisonAt(
             reader.table,

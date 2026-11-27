@@ -262,6 +262,11 @@ test('parse errors explain the problem in one line', () => {
         ['{{else}}', '{{else}} is only allowed inside a block.', '1:0'],
         ['{{.foo}}', "Invalid path: a name cannot follow a leading '.'.", '1:0'],
         ['{{foo "a}}', 'Unterminated string: the closing quote is missing.', '1:2'],
+        ['{{upp {{x}}', "Unclosed expression {{upp: expected '}}'.", '1:0'],
+        ['{{upp{{x}}', "Unclosed expression {{upp: expected '}}'.", '1:0'],
+        ['{{foo bar=}}', 'Missing value after bar=.', '1:9'],
+        ['{{foo bar=baz=}}', "Unexpected '=' in this expression.", '1:13'],
+        ['{{foo}', "Unexpected '}' in this expression.", '1:5'],
     ];
     for (const [source, message, at] of cases) {
         assert.deepEqual(errorOf(source), { message, at }, source);

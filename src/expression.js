@@ -561,8 +561,19 @@ function isHashPairStart(reader) {
  */
 function parseHashPair(reader) {
     const keyToken = reader.expect(TokenType.ID);
-    reader.expect(TokenType.EQUALS);
+    const equals = reader.expect(TokenType.EQUALS);
     const value = parseExpressionParameter(reader);
+    // `key=` with nothing after it: upstream rejects it, anchored at the `=`.
+    if (!value) {
+        const start = offsetToPosition(reader.table, equals.start);
+        const end = offsetToPosition(reader.table, equals.end);
+        throw new HandlebarsParseError(`Missing value after ${keyToken.value}=.`, {
+            first_line: start.line,
+            first_column: start.column,
+            last_line: end.line,
+            last_column: end.column,
+        });
+    }
     // The value's last code unit is the end of the last token the value parser consumed.
     const lastValueToken = reader.peek(-1);
     const endOffset = lastValueToken ? lastValueToken.end : keyToken.end;

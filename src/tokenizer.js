@@ -60,6 +60,8 @@
  *   - RAW_CONTENT    `{ value }` — the verbatim raw-block body (inner `{{` NOT parsed). `value ===
  *                    source.slice(start,end)`.
  *   - RAW_CLOSE      `{ name }` — the `{{{{/name}}}}` raw-block close. `name` is the block name.
+ *   - INVALID        `{ value }` — a single character that cannot start any expression atom
+ *                    (a stray `{`, `}`, `]`, `!`, …). The parser always rejects it.
  *   - EOF            `{}` — the final token (`start === end === source.length`).
  *
  * ── Lexical-error signalling (for W2b) ───────────────────────────────────────────────────
@@ -102,6 +104,7 @@ export const TokenType = {
     RAW_OPEN: 'RAW_OPEN',
     RAW_CONTENT: 'RAW_CONTENT',
     RAW_CLOSE: 'RAW_CLOSE',
+    INVALID: 'INVALID',
     EOF: 'EOF',
 };
 
@@ -638,9 +641,18 @@ export function tokenize(source) {
      */
     function lexId(cursor) {
         const end = scanWhile(cursor, isIdChar);
-        // A lone character that is not an id char would produce a zero-length id; consume one
-        // code unit as an id to guarantee progress (the parser will reject stray characters).
-        const effectiveEnd = end > cursor ? end : cursor + 1;
+        // A lone character that is not an id char (a stray `{`, `}`, `]`, …) is not a name:
+        // emit it as INVALID so the parser rejects it instead of reading `{{x` as a path.
+        if (end === cursor) {
+            tokens.push({
+                type: TokenType.INVALID,
+                start: cursor,
+                end: cursor + 1,
+                value: source.slice(cursor, cursor + 1),
+            });
+            return cursor + 1;
+        }
+        const effectiveEnd = end;
         tokens.push({
             type: TokenType.ID,
             start: cursor,
